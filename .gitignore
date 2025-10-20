@@ -1,0 +1,14 @@
+__pycache__/
+*.py[codz]
+*$py.class
+
+# Jupyter Notebook
+.ipynb_checkpoints
+*.ipynb
+
+# pyenv
+.python-version
+
+
+# Mac
+**/.DS_Store
