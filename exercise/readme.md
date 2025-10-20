@@ -17,3 +17,9 @@ gpg --output sheet01-programming.zip --decrypt sheet01-programming.zip.gpg
 ```bash
 unzip sheet01-programming.zip
 ```
+
+## Run
+
+```bash
+jupyter notebook
+```
