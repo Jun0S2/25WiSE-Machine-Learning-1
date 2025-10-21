@@ -336,9 +336,149 @@ def s2c():
     
     return P_omega1_given_x, P_omega2_given_x, Bayes_error
 
-# Run Exercise 2
-if __name__ == "__main__":
-    print("Running Exercise 2...")
-    X, Y, P1, P2 = s2a()
-    X, Y, P_x = s2b()
-    post1, post2, error = s2c()
+import numpy as np
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
+
+# (이전 Exercise 1, 2 코드는 생략됨)
+
+# ===================== Exercise 3: Reducing the Variance =====================
+
+def s3a():
+    """
+    Plot the new class posterior probabilities P(ω1|x) and P(ω2|x) 
+    associated with the new covariance matrices, and print the new Bayes error rate.
+    
+    New parameters:
+    - μ1 = [1, 1], μ2 = [-1, -1] (Same as Ex 2)
+    - P(ω1) = 0.5, P(ω2) = 0.5 (Same as Ex 2)
+    - Σ1 = [[2, 1], [1, 2]] (Same as Ex 2)
+    - Σ2 = Σ1 / 4
+    """
+    print("=== Exercise 3a: New Posterior Probabilities and Bayes Error ===")
+    
+    # 1. Create grid
+    R = np.arange(-4, 4 + 1e-9, 0.1) # Grid from -4 to 4, step 0.1
+    X, Y = np.meshgrid(R, R)
+    
+    # 2. Define parameters
+    mu1 = np.array([1, 1])    # Mean for class 1
+    mu2 = np.array([-1, -1])  # Mean for class 2  
+    
+    Sigma1 = np.array([[2, 1], [1, 2]])  # Covariance matrix for class 1
+    Sigma2 = Sigma1 / 4.0                # Covariance matrix for class 2 (reduced variance)
+    
+    P_omega1 = 0.5 # Prior for class 1
+    P_omega2 = 0.5 # Prior for class 2
+    
+    # 3. Compute the two class-conditional distributions P(x|ω1) and P(x|ω2)
+    
+    # --- P(x|ω1) computation (using Σ1) ---
+    Sigma1_inv = np.linalg.inv(Sigma1)
+    Sigma1_det = np.linalg.det(Sigma1)
+    constant1 = 1 / (2 * np.pi * np.sqrt(Sigma1_det)) # Normalization constant for P(x|ω1)
+    
+    P_x_given_omega1 = np.zeros_like(X)
+    
+    # --- P(x|ω2) computation (using Σ2) ---
+    Sigma2_inv = np.linalg.inv(Sigma2)
+    Sigma2_det = np.linalg.det(Sigma2)
+    constant2 = 1 / (2 * np.pi * np.sqrt(Sigma2_det)) # Normalization constant for P(x|ω2)
+    
+    P_x_given_omega2 = np.zeros_like(X)
+    
+    # Iterate over all grid points (x, y)
+    for i in range(X.shape[0]):
+        for j in range(X.shape[1]):
+            x_vec = np.array([X[i,j], Y[i,j]])
+            
+            # P(x|ω1) calculation
+            diff1 = x_vec - mu1
+            # Exponent: -0.5 * (x-μ1)ᵀ Σ1⁻¹ (x-μ1)
+            exponent1 = -0.5 * diff1.T @ Sigma1_inv @ diff1
+            P_x_given_omega1[i,j] = constant1 * np.exp(exponent1)
+            
+            # P(x|ω2) calculation (reduced variance)
+            diff2 = x_vec - mu2
+            # Exponent: -0.5 * (x-μ2)ᵀ Σ2⁻¹ (x-μ2)
+            exponent2 = -0.5 * diff2.T @ Sigma2_inv @ diff2
+            P_x_given_omega2[i,j] = constant2 * np.exp(exponent2)
+            
+    # 4. Compute Total Probability P(x)
+    # P(x) = P(ω1)P(x|ω1) + P(ω2)P(x|ω2)
+    P_x = P_omega1 * P_x_given_omega1 + P_omega2 * P_x_given_omega2
+    
+    # 5. Compute Posterior Probabilities
+    # P(ω|x) = P(x|ω)P(ω) / P(x)
+    
+    # Avoid division by zero: if P(x) is 0, the posterior is undefined, 
+    # but for continuous distributions and a sufficiently large grid, 
+    # this rarely happens. We can use np.divide with a default value.
+    # In regions where P(x) is near zero, P(x|ω)P(ω) will also be near zero, 
+    # so the ratio will be near 0.5 (for equal priors) or 0/0.
+    # We use a small epsilon for stability if P(x) is exactly 0, 
+    # but standard np.divide is usually fine here.
+    
+    # P(ω1|x)
+    P_omega1_given_x = np.divide((P_x_given_omega1 * P_omega1), P_x, 
+                                 out=np.zeros_like(P_x), where=P_x!=0)
+    
+    # P(ω2|x)
+    P_omega2_given_x = np.divide((P_x_given_omega2 * P_omega2), P_x, 
+                                 out=np.zeros_like(P_x), where=P_x!=0)
+    
+    # Check normalization: P(ω1|x) + P(ω2|x) should sum to 1 where P(x) > 0
+    # print(f"Max P(ω1|x) + P(ω2|x): {np.max(P_omega1_given_x + P_omega2_given_x):.6f}")
+    
+    # 6. Plot Posterior Probabilities
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 6))
+    
+    # Plot P(ω1|x)
+    contour1 = ax1.contourf(X, Y, P_omega1_given_x, levels=50, cmap='Reds', vmin=0, vmax=1)
+    ax1.set_xlabel('X')
+    ax1.set_ylabel('Y')
+    ax1.set_title('P(ω₁|x) - Posterior Class 1 (New $\Sigma_2$)')
+    ax1.plot(mu1[0], mu1[1], 'ro', markersize=10)
+    plt.colorbar(contour1, ax=ax1)
+    
+    # Plot P(ω2|x)
+    contour2 = ax2.contourf(X, Y, P_omega2_given_x, levels=50, cmap='Blues', vmin=0, vmax=1)
+    ax2.set_xlabel('X')
+    ax2.set_ylabel('Y')
+    ax2.set_title('P(ω₂|x) - Posterior Class 2 (New $\Sigma_2$)')
+    ax2.plot(mu2[0], mu2[1], 'bo', markersize=10)
+    plt.colorbar(contour2, ax=ax2)
+    
+    plt.tight_layout()
+    plt.show()
+    
+    # 7. Compute Bayes Error Rate
+    # P(error|x) = min(P(ω1|x), P(ω2|x))
+    P_error_given_x = np.minimum(P_omega1_given_x, P_omega2_given_x)
+    
+    # P(error) = ∫ P(error|x) P(x) dx ≈ Σ min(P(ω1|x), P(ω2|x)) * P(x) * ΔxΔy
+    delta_x = R[1] - R[0] # 0.1
+    delta_y = R[1] - R[0] # 0.1
+    area_element = delta_x * delta_y # 0.01
+    
+    # Approximate the integral
+    Bayes_error = np.sum(P_error_given_x * P_x) * area_element
+    
+    print(f"\nNew Bayes Error Rate: {Bayes_error:.4f} ({Bayes_error*100:.2f}%)")
+    
+    # Plot the error regions (optional, but good for visualization)
+    plt.figure(figsize=(10, 8))
+    contour = plt.contourf(X, Y, P_error_given_x, levels=50, cmap='hot')
+    plt.colorbar(contour, label='P(error|x)')
+    
+    plt.xlabel('X')
+    plt.ylabel('Y')
+    plt.title('Probability of Error P(error|x) (New $\Sigma_2$)')
+    plt.plot(mu1[0], mu1[1], 'ro', markersize=10, label='μ₁')
+    plt.plot(mu2[0], mu2[1], 'bo', markersize=10, label='μ₂')
+    plt.legend()
+    
+    plt.show()
+    
+    return P_omega1_given_x, P_omega2_given_x, Bayes_error
+
